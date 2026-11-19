@@ -37,7 +37,7 @@ class Voiture:
         """Crée une voiture à l'arrêt au point (x, y), orientée selon `angle` (en radians)."""
         self.x = x
         self.y = y
-        self.k = 1
+        self.k = 10
         self.angle = angle
         self.jeu = jeu
         self.mu = 1
