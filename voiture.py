@@ -17,20 +17,13 @@ Le repère est celui de l'écran, en mètres :
 """
 
 import math
+import pygame
 
 from reglages import (ACCELERATION, ACCELERATION_LATERALE_MAX, BRAQUAGE_MAX_DEGRES, EMPATTEMENT,
                       FREINAGE, LARGEUR_VOITURE, LONGUEUR_VOITURE, VITESSE_MAX_KMH, VITESSE_RECUL_MAX)
 
-circuit = pygame.image.load("circuit.png")
+from jeu import *
 
-# Position de la roue
-x = voiture_x
-y = voiture_y
-
-# Lire la couleur du pixel
-couleur = circuit.get_at((x, y))
-
-print(couleur)
 
 def borner(valeur, minimum, maximum):
     """Ramène `valeur` entre `minimum` et `maximum`."""
@@ -40,15 +33,16 @@ def borner(valeur, minimum, maximum):
 class Voiture:
     """Une voiture : position, orientation, vitesse."""
 
-    def __init__(self, x, y, angle):
+    def __init__(self, x, y, angle, jeu):
         """Crée une voiture à l'arrêt au point (x, y), orientée selon `angle` (en radians)."""
         self.x = x
         self.y = y
         self.k = 1
         self.angle = angle
+        self.jeu = jeu
+        self.mu = 1
         self.vitesse = 0.0                       # négative en marche arrière
         self.vitesse_max = VITESSE_MAX_KMH / 3.6  # km/h → m/s
-        self.couleur_circuit = (90,90,96)
 
         # Position au pas précédent. Elle sert uniquement à rendre l'animation
         # fluide (voir la méthode coins). Vous pouvez l'ignorer pour l'instant.
@@ -83,16 +77,12 @@ class Voiture:
             self.debut_tourner = True
             self.angle_depart_derapage = 0
 
-        # Récupérer la couleur sous la voiture
-        self.couleur_circuit = circuit.get_at((self.x, self.y))
-
-        print(couleur)
         #0) On cherche sur quel type de matériel on est :
-        if self.couleur_circuit == (255,255,255) :
+        if self.jeu.couleur_sous_roues == (255,255,255) :
             self.mu = 0.3
-        elif self.couleur_circuit == (90,90,96) :
+        elif self.jeu.couleur_sous_roues == (90,90,96) :
             self.mu = 1.0
-        elif self.couleur_circuit == (77,47,25) :
+        elif self.jeu.couleur_sous_roues == (77,47,25) :
             self.mu = 0.7
 
 

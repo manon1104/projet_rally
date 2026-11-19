@@ -33,7 +33,7 @@ from reglages import (ACCELERATION, AGRANDIR_VOITURE, BRAQUAGE_MAX_DEGRES, CIRCU
                       COULEUR_BANDEAU, COULEUR_BORD, COULEUR_HERBE, COULEUR_LIGNE_CENTRALE, COULEUR_PISTE,
                       COULEUR_TEXTE, COULEUR_VOITURE, DT, ECHELLE, FREINAGE, HAUTEUR_BANDEAU, HAUTEUR_FENETRE,
                       IMAGES_PAR_SECONDE, LARGEUR_FENETRE, LARGEUR_PISTE, NOMBRE_DE_TOURS, CAPACITE_RESERVOIRE, ALPHA, CONSO)
-from voiture import Voi
+from voiture import Voiture
 
 
 def formater_temps(secondes):
@@ -55,17 +55,18 @@ class Jeu:
 
         self.circuit = Circuit(CIRCUIT_CHOISI, CIRCUITS[CIRCUIT_CHOISI], LARGEUR_PISTE)
         self.en_marche = True
-        self.nouvelle_partie()
+        self.surface_detection = pygame.Surface(self.ecran.get_size())
         # a modifier si on change de circuit ou alors il faut qu'il y ait le même nombre de point ddns les deux circuits
         self.troncons = [
-            (0,10, (90, 90, 96)),
-            (10,20,(255,255,255)),
-            (20,26,(77, 47, 25))
+            (0, 10, (90, 90, 96)),
+            (10, 20, (255, 255, 255)),
+            (20, 26, (77, 47, 25))
         ]
+        self.nouvelle_partie()
 
     def nouvelle_partie(self):
         """Remet la voiture sur la ligne de départ et le chrono à zéro."""
-        self.voiture = Voiture(self.circuit.x_depart, self.circuit.y_depart, self.circuit.angle_depart)
+        self.voiture = Voiture(self.circuit.x_depart, self.circuit.y_depart, self.circuit.angle_depart,self)
         self.etat = "accueil"
         self.temps = 0.0                  # temps de course, en secondes
         self.reserve_de_temps = 0.0       # voir « le pas de temps fixe » en haut du fichier
@@ -80,6 +81,7 @@ class Jeu:
         self.penalite = [0,0,0]
         self.penalite_tot = 0
         self.essence = CAPACITE_RESERVOIRE
+        self.couleur_sous_roues = self.surface_detection.get_at((int(self.voiture.x), int(self.voiture.y)))[:3]
         # numéro du tour en cours
         # À FAIRE (partie 1) : ajouter ici ce qu'il faut pour compter les tours,
         # mémoriser le temps de chaque tour et le dernier point valide.
@@ -203,6 +205,12 @@ class Jeu:
         if 50 <= self.voiture.x <= 80 and 50 <= self.voiture.y <= 70 and self.essence < 50:
             self.essence = self.essence + 0.5
 
+        largeur, hauteur = self.surface_detection.get_size()
+        x, y = self.vers_ecran(self.voiture.x, self.voiture.y)
+        if 0 <= x < largeur and 0 <= y < hauteur:
+            self.couleur_sous_roues = self.surface_detection.get_at((int(x), int(y)))[:3]
+        else:
+            self.couleur_sous_roues = None
 
 
 
@@ -248,6 +256,7 @@ class Jeu:
         """La piste : un rectangle autour de chaque segment, et un disque sur chaque point
         pour arrondir les jointures. D'abord en blanc et un peu plus large (les bords),
         puis en gris par-dessus."""
+        self.surface_detection.fill((0, 180, 0))
         for debut, fin, couleur in self.troncons:
             for couleur, demi_largeur in [(COULEUR_BORD, LARGEUR_PISTE / 2 + 1), (couleur, LARGEUR_PISTE / 2)]:
                 for i in range(debut, min(fin, len(self.circuit.segments))):
@@ -258,9 +267,11 @@ class Jeu:
                     rectangle = [self.vers_ecran(ax + px, ay + py), self.vers_ecran(bx + px, by + py),
                                  self.vers_ecran(bx - px, by - py), self.vers_ecran(ax - px, ay - py)]
                     pygame.draw.polygon(self.ecran, couleur, rectangle)
+                    pygame.draw.polygon(self.surface_detection, couleur, rectangle)
                 for i in range(debut, min(fin + 1, len(self.circuit.points))):
                     x, y = self.circuit.points[i]
                     pygame.draw.circle(self.ecran, couleur, self.vers_ecran(x, y), int(demi_largeur * ECHELLE))
+                    pygame.draw.circle(self.surface_detection, couleur, self.vers_ecran(x, y), int(demi_largeur * ECHELLE))
                 pygame.draw.rect(self.ecran, (24, 93, 158), (90, 160, 30, 40))
 
 
