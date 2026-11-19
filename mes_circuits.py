@@ -92,5 +92,4 @@ CIRCUIT_2 = [
 CIRCUITS = {
     "rectangle": RECTANGLE,
     "circuit_2" : CIRCUIT_2,
-    "ravito": RAVITO
 }

@@ -1,6 +1,6 @@
 """
 LA CLASSE JEU
-=============hgfhjfg
+=============
 
 Le jeu possède un circuit et une voiture, et les fait fonctionner ensemble.
 C'est le seul fichier qui utilise pygame.
