@@ -147,7 +147,6 @@ class Jeu:
             acceleration = ACCELERATION
         elif touches[pygame.K_DOWN] or touches[pygame.K_s]:
             acceleration = -FREINAGE
-
         braquage = 0.0
         braquage_max = math.radians(BRAQUAGE_MAX_DEGRES)
         if touches[pygame.K_LEFT] or touches[pygame.K_q]:
