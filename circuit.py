@@ -47,6 +47,7 @@ class Circuit:
         self.points = points
         self.largeur = largeur
 
+
         # Les segments : (point de début, point de fin). Le dernier revient au premier.
         # « % len(points) » ramène l'indice à 0 quand on dépasse la fin de la liste.
         self.segments = []
@@ -73,3 +74,5 @@ class Circuit:
     def est_sur_la_piste(self, x, y):
         """Vrai si le point (x, y) est sur la piste."""
         return self.distance_au_centre(x, y) <= self.largeur / 2
+
+

@@ -33,7 +33,7 @@ from reglages import (ACCELERATION, AGRANDIR_VOITURE, BRAQUAGE_MAX_DEGRES, CIRCU
                       COULEUR_BANDEAU, COULEUR_BORD, COULEUR_HERBE, COULEUR_LIGNE_CENTRALE, COULEUR_PISTE,
                       COULEUR_TEXTE, COULEUR_VOITURE, DT, ECHELLE, FREINAGE, HAUTEUR_BANDEAU, HAUTEUR_FENETRE,
                       IMAGES_PAR_SECONDE, LARGEUR_FENETRE, LARGEUR_PISTE, NOMBRE_DE_TOURS, CAPACITE_RESERVOIRE, ALPHA, CONSO)
-from voiture import Voiture
+from voiture import Voi
 
 
 def formater_temps(secondes):
@@ -91,9 +91,11 @@ class Jeu:
             if self.tour == (NOMBRE_DE_TOURS+1):
                 self.etat = 'fin'
 
+
     def derniere_pos_valide(self):
         if self.sur_la_piste == True:
             self.last_pos_valide = (self.voiture.x, self.voiture.y)
+
 
     def lancer(self):
         """Fait tourner le jeu jusqu'à ce qu'on ferme la fenêtre."""
@@ -126,6 +128,7 @@ class Jeu:
                     self.etat = "course"
                 elif evenement.key == pygame.K_r:
                     self.nouvelle_partie()
+
 
     def lire_commandes_clavier(self):
         """Transforme les touches enfoncées en commandes : (accélération, braquage)."""
@@ -182,8 +185,10 @@ class Jeu:
                 self.voiture.x = self.last_pos_valide[0]
                 self.voiture.y = self.last_pos_valide[1]
                 self.sortie = True
+
         self.compter_tour()
         self.derniere_pos_valide()
+
         if self.essence > 0:
             self.essence = self.essence - self.consommation()
         if self.essence <= 0:
@@ -191,6 +196,8 @@ class Jeu:
             self.voiture.vitesse = 0
         if 50 <= self.voiture.x <= 80 and 50 <= self.voiture.y <= 70 and self.essence < 50:
             self.essence = self.essence + 0.5
+
+
 
 
 
@@ -209,7 +216,6 @@ class Jeu:
         self.quantite = CAPACITE_RESERVOIRE
         while self.quantite > 0:
             self.quantite = self.quantite - self.consommation()
-
 
 
     # Le dessin

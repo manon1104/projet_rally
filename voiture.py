@@ -21,6 +21,16 @@ import math
 from reglages import (ACCELERATION, ACCELERATION_LATERALE_MAX, BRAQUAGE_MAX_DEGRES, EMPATTEMENT,
                       FREINAGE, LARGEUR_VOITURE, LONGUEUR_VOITURE, VITESSE_MAX_KMH, VITESSE_RECUL_MAX)
 
+circuit = pygame.image.load("circuit.png")
+
+# Position de la roue
+x = voiture_x
+y = voiture_y
+
+# Lire la couleur du pixel
+couleur = circuit.get_at((x, y))
+
+print(couleur)
 
 def borner(valeur, minimum, maximum):
     """Ramène `valeur` entre `minimum` et `maximum`."""
@@ -34,15 +44,22 @@ class Voiture:
         """Crée une voiture à l'arrêt au point (x, y), orientée selon `angle` (en radians)."""
         self.x = x
         self.y = y
+        self.k = 1
         self.angle = angle
         self.vitesse = 0.0                       # négative en marche arrière
         self.vitesse_max = VITESSE_MAX_KMH / 3.6  # km/h → m/s
+        self.couleur_circuit = (90,90,96)
 
         # Position au pas précédent. Elle sert uniquement à rendre l'animation
         # fluide (voir la méthode coins). Vous pouvez l'ignorer pour l'instant.
         self.ancien_x = x
         self.ancien_y = y
         self.ancien_angle = angle
+
+        # Pour le dérapage :
+        self.debut_tourner = True
+        self.angle_depart_derapage = 0
+        self.angle_derapage = 0
 
     def avancer(self, acceleration, braquage, dt):
         """Fait avancer la voiture pendant `dt` secondes.
@@ -54,6 +71,31 @@ class Voiture:
         """
         self.ancien_x, self.ancien_y, self.ancien_angle = self.x, self.y, self.angle
 
+        # 0) On vérifie si l'on est dans une dirconstance de dérapage
+        touches = pygame.key.get_pressed()
+        if touches[pygame.K_LEFT] or touches[pygame.K_RIGHT]:
+            if self.debut_tourner == True:
+                self.angle_depart_derapage = self.angle
+                self.debut_tourner = False
+            self.angle_derapage = abs(self.angle_depart_derapage - self.angle)
+
+        elif touches[pygame.K_UP] or touches[pygame.K_DOWN]:
+            self.debut_tourner = True
+            self.angle_depart_derapage = 0
+
+        # Récupérer la couleur sous la voiture
+        self.couleur_circuit = circuit.get_at((self.x, self.y))
+
+        print(couleur)
+        #0) On cherche sur quel type de matériel on est :
+        if self.couleur_circuit == (255,255,255) :
+            self.mu = 0.3
+        elif self.couleur_circuit == (90,90,96) :
+            self.mu = 1.0
+        elif self.couleur_circuit == (77,47,25) :
+            self.mu = 0.7
+
+
         # 1) On respecte les valeurs maximales.
         acceleration = borner(acceleration, -FREINAGE, ACCELERATION)
         limite = self.braquage_max()
@@ -62,14 +104,23 @@ class Voiture:
         # 2) La vitesse change : accélération moins frottement.
         #    Le frottement est réglé pour que la voiture plafonne à sa vitesse maximale.
         frottement = ACCELERATION / self.vitesse_max
-        self.vitesse = self.vitesse + (acceleration - frottement * self.vitesse) * dt
-        self.vitesse = borner(self.vitesse, -VITESSE_RECUL_MAX, self.vitesse_max)
+        #condition sur le dérapage qui modifie la vitesse
+        if (self.vitesse ** 2) * abs(math.sin(self.angle_derapage)) > self.mu * self.k:
+            self.vitesse = self.vitesse * 0.9
+        else :
+            self.vitesse = self.vitesse + (acceleration - frottement * self.vitesse) * dt
+            self.vitesse = borner(self.vitesse, -VITESSE_RECUL_MAX, self.vitesse_max)
+
 
         # 3) L'orientation change (« modèle bicyclette ») : plus on va vite et
         #    plus les roues sont tournées, plus la voiture tourne vite.
         self.angle = self.angle + self.vitesse * math.tan(braquage) / EMPATTEMENT * dt
 
+
         # 4) La position change : on avance de (vitesse × dt) mètres dans la direction de l'angle.
+        if (self.vitesse ** 2) * abs(math.sin(self.angle_derapage)) > self.mu * self.k:
+            self.x = self.x + self.vitesse * math.cos(self.angle*1.4) * dt
+            self.y = self.y + self.vitesse * math.sin(self.angle*1.4) * dt
         self.x = self.x + self.vitesse * math.cos(self.angle) * dt
         self.y = self.y + self.vitesse * math.sin(self.angle) * dt
 
