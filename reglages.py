@@ -12,9 +12,9 @@ degrés pour l'angle de braquage.
 # ---------------------------------------------------------------------------
 # La course
 # ---------------------------------------------------------------------------
-CIRCUIT_CHOISI = "ravito"     # nom d'un circuit de mes_circuits.py : "rectangle"
+CIRCUIT_CHOISI = "rectangle"     # nom d'un circuit de mes_circuits.py : "rectangle"
 NOMBRE_DE_TOURS = 3              # imposé par le sujet : 3 par défaut, entre 2 et 5
-LARGEUR_PISTE = 12              # m (imposé par le sujet) (12)
+LARGEUR_PISTE = 22              # m (imposé par le sujet) (12)
 DT = 0.1                         # pas de temps de la simulation, en secondes (imposé par le sujet)
 
 # ---------------------------------------------------------------------------

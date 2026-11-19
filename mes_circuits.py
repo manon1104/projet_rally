@@ -23,19 +23,27 @@ Pour créer votre circuit :
 
 # Exemple : un rectangle aux coins coupés, écrit point par point.
 
+# tous les circuits doivent faire 26 points sinon la couleur marche pas
+# 26 points
 RECTANGLE = [
     (250, 290),   # départ / arrivée
+    (300,290),
+    (350,290),
+    (400,290),
     (440, 290),
     (490, 270),   # coin en bas à droite (2 points pour l'adoucir)
-    (510, 220), (510, 90),
+    (510, 220), (510, 200), (510,160), (510, 90),
     (490, 40),    # coin en haut à droite
-    (440, 20), (110, 20),
+    (440, 20),(400,20), (350,20), (300,20), (200,20), (110, 20),
     (60, 40),     # coin en haut à gauche
-    (40, 90), (40, 220),
+    (40, 90), (40,160), (40,200), (40, 220),
     (60, 270),    # coin en bas à gauche
     (110, 290),
+    (160,290),
+    (200,290),
 ]
 
+# 26 points
 CIRCUIT_2 = [
     (250, 290),   # départ / arrivée
     (440, 290),
@@ -62,6 +70,21 @@ RAVITO = [
     (40, 90),(30,60), (40, 220),
     (60, 270),    # coin en bas à gauche
     (110, 290),
+]
+
+CIRCUIT_2 = [
+    (250, 290),   # départ / arrivée
+    (440, 290),
+    (490, 270),   # coin en bas à droite (2 points pour l'adoucir)
+    (510, 220), (510, 90),
+    (490, 40),    # coin en haut à droite
+    (440, 10),(430,10),
+    (400,40), (400,180), (380,200), (360, 180), (350, 60), (320, 40), # point au centre
+    (60, 40),  (40,60),   # coin en haut à gauche
+    (40, 90), (40,260),
+    (50, 270), (100, 270), (110, 260),   # coin en bas à gauche
+    (130,100), (145,90), (160, 100),
+    (190, 270), (200,290)
 ]
 
 

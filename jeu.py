@@ -1,6 +1,6 @@
 """
 LA CLASSE JEU
-=============
+=============hgfhjfg
 
 Le jeu possède un circuit et une voiture, et les fait fonctionner ensemble.
 C'est le seul fichier qui utilise pygame.
@@ -56,6 +56,12 @@ class Jeu:
         self.circuit = Circuit(CIRCUIT_CHOISI, CIRCUITS[CIRCUIT_CHOISI], LARGEUR_PISTE)
         self.en_marche = True
         self.nouvelle_partie()
+        # a modifier si on change de circuit ou alors il faut qu'il y ait le même nombre de point ddns les deux circuits
+        self.troncons = [
+            (0,10, (90, 90, 96)),
+            (10,20,(255,255,255)),
+            (20,26,(77, 47, 25))
+        ]
 
     def nouvelle_partie(self):
         """Remet la voiture sur la ligne de départ et le chrono à zéro."""
@@ -237,22 +243,29 @@ class Jeu:
             self.dessiner_fin()
         pygame.display.flip()
 
+
     def dessiner_piste(self):
         """La piste : un rectangle autour de chaque segment, et un disque sur chaque point
         pour arrondir les jointures. D'abord en blanc et un peu plus large (les bords),
         puis en gris par-dessus."""
-        for couleur, demi_largeur in [(COULEUR_BORD, LARGEUR_PISTE / 2 + 1), (COULEUR_PISTE, LARGEUR_PISTE / 2)]:
-            for (ax, ay), (bx, by) in self.circuit.segments:
-                # Vecteur perpendiculaire au segment, de longueur demi_largeur
-                longueur = math.hypot(bx - ax, by - ay)
-                px = -(by - ay) / longueur * demi_largeur
-                py = (bx - ax) / longueur * demi_largeur
-                rectangle = [self.vers_ecran(ax + px, ay + py), self.vers_ecran(bx + px, by + py),
-                             self.vers_ecran(bx - px, by - py), self.vers_ecran(ax - px, ay - py)]
-                pygame.draw.polygon(self.ecran, couleur, rectangle)
-            for x, y in self.circuit.points:
-                pygame.draw.circle(self.ecran, couleur, self.vers_ecran(x, y), int(demi_largeur * ECHELLE))
-            pygame.draw.rect(self.ecran, (24, 93, 158), (90, 160, 30, 40))
+        for debut, fin, couleur in self.troncons:
+            for couleur, demi_largeur in [(COULEUR_BORD, LARGEUR_PISTE / 2 + 1), (couleur, LARGEUR_PISTE / 2)]:
+                for i in range(debut, min(fin, len(self.circuit.segments))):
+                    (ax, ay), (bx, by) = self.circuit.segments[i]
+                    longueur = math.hypot(bx - ax, by - ay)
+                    px = -(by - ay) / longueur * demi_largeur
+                    py = (bx - ax) / longueur * demi_largeur
+                    rectangle = [self.vers_ecran(ax + px, ay + py), self.vers_ecran(bx + px, by + py),
+                                 self.vers_ecran(bx - px, by - py), self.vers_ecran(ax - px, ay - py)]
+                    pygame.draw.polygon(self.ecran, couleur, rectangle)
+                for i in range(debut, min(fin + 1, len(self.circuit.points))):
+                    x, y = self.circuit.points[i]
+                    pygame.draw.circle(self.ecran, couleur, self.vers_ecran(x, y), int(demi_largeur * ECHELLE))
+                pygame.draw.rect(self.ecran, (24, 93, 158), (90, 160, 30, 40))
+
+
+
+
 
         # La ligne centrale (fine) : ce sont les points de mes_circuits.py
         points_ecran = [self.vers_ecran(x, y) for x, y in self.circuit.points]
@@ -264,7 +277,6 @@ class Jeu:
         dx, dy = -math.sin(angle) * LARGEUR_PISTE / 2, math.cos(angle) * LARGEUR_PISTE / 2
         pygame.draw.line(self.ecran, COULEUR_BORD, self.vers_ecran(x0 + dx, y0 + dy),
                          self.vers_ecran(x0 - dx, y0 - dy), 4)
-
 
 
     def dessiner_voiture(self):
