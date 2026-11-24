@@ -90,5 +90,15 @@ COULEUR_TEXTE = (240, 240, 240)
 COULEUR_ALERTE = (255, 90, 70)
 COULEUR_RAVITAILLEMENT = (24, 93, 158)
 
+# ajout de qqls réglages pour le pilote automatique
+DIST_STATION = 150
+DIST_APPROCHE = 30
+MARGE_ESSENCE = 1.15
+STATIONS = {
+    "rectangle": (54, 59),
+    "circuit_rond": (91, 166),
+    "circuit_2": (312, 40),
+    "circuit_3": (359, 217),
+    "circuit_4": (242, 62),}
 
 

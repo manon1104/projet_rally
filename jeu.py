@@ -32,7 +32,9 @@ from mes_circuits import CIRCUITS
 from reglages import (ACCELERATION, AGRANDIR_VOITURE, BRAQUAGE_MAX_DEGRES, CIRCUIT_CHOISI, COULEUR_ALERTE,
                       COULEUR_BANDEAU, COULEUR_BORD, COULEUR_HERBE, COULEUR_LIGNE_CENTRALE, COULEUR_PISTE,
                       COULEUR_TEXTE, COULEUR_VOITURE, DT, ECHELLE, FREINAGE, HAUTEUR_BANDEAU, HAUTEUR_FENETRE,
-                      IMAGES_PAR_SECONDE, LARGEUR_FENETRE, LARGEUR_PISTE, NOMBRE_DE_TOURS, CAPACITE_RESERVOIRE, ALPHA, CONSO, COULEUR_VOITURE_2,)
+                      IMAGES_PAR_SECONDE, LARGEUR_FENETRE, LARGEUR_PISTE, NOMBRE_DE_TOURS, CAPACITE_RESERVOIRE, ALPHA,
+                      CONSO, LONGUEUR_VOITURE, COULEUR_VOITURE_2, VITESSE_MAX_KMH, DIST_APPROCHE, MARGE_ESSENCE,
+                      STATIONS, DIST_STATION)
 from voiture import Voiture
 
 
@@ -55,12 +57,18 @@ class Jeu:
 
         # Circuits disponibles
         self.circuits_disponibles = list(CIRCUITS.keys())
+        # Change en fonction du circuit sélectionné
         self.circuit_selectionne = (self.circuits_disponibles.index(CIRCUIT_CHOISI))
         self.en_marche = True
+        # Initialisation du detecteur de surface (pour le dérapage, changement de mu)
         self.surface_detection = pygame.Surface(self.ecran.get_size())
         self.charger_circuit(self.circuits_disponibles[self.circuit_selectionne])
         self.nouvelle_partie()
-        self.etat = "choix_circuit"
+        # Initialise au premier choix du joueur : s'il est seul ou s'ils sont deux
+        self.etat = "choix_joueurs"
+        # Change en fonction de si on veut jouer seul ou à deux
+        self.nombre_joueurs = 1
+
 
 
     # pour faire la course après avoir lancé le bon circuit
@@ -98,44 +106,88 @@ class Jeu:
 
     def nouvelle_partie(self):
         """Remet la voiture sur la ligne de départ et le chrono à zéro."""
-        self.voiture = Voiture(self.circuit.x_depart, self.circuit.y_depart+3, self.circuit.angle_depart) # penser à rajouter self pour le dérapage
-        self.voiture2 = Voiture(self.circuit.x_depart,self.circuit.y_depart - 3,self.circuit.angle_depart)
+        self.voiture = Voiture(self.circuit.x_depart, self.circuit.y_depart+3, self.circuit.angle_depart, self)
+        # on rajoute une nouvelle voiture et on modifie la position de départ pour ne pas les superposer
+        self.voiture2 = Voiture(self.circuit.x_depart,self.circuit.y_depart-3,self.circuit.angle_depart, self)
         # la ligne de départ n'est pas dans le même sens pour le circuit rond
         if self.circuit.nom == "circuit_rond":
-            self.voiture = Voiture(self.circuit.x_depart -3 , self.circuit.y_depart, self.circuit.angle_depart)  # penser à rajouter self pour le dérapage
-            self.voiture2 = Voiture(self.circuit.x_depart +3 , self.circuit.y_depart, self.circuit.angle_depart)
+            # Dans le circuit rond, la ligne de départ n'est pas au même endroit, on doit modifier x pour ne pas superposer les voitures
+            self.voiture = Voiture(self.circuit.x_depart-3 , self.circuit.y_depart, self.circuit.angle_depart, self)
+            self.voiture2 = Voiture(self.circuit.x_depart+3 , self.circuit.y_depart, self.circuit.angle_depart, self)
 
         self.etat = "accueil"
         self.temps = 0.0                  # temps de course, en secondes
         self.reserve_de_temps = 0.0       # voir « le pas de temps fixe » en haut du fichier
         self.sur_la_piste = True
         self.sur_la_piste2 = True
+
+        #introduction de nouvelles variables qui permettent le compte de tours
         self.tour = 1
         self.tour2 = 1
+
+        #introduction de variables qui permettent de noter le temps de chaque tour
         self.temps_tour_1 = 0.0
         self.temps_tour2_1 = 0.0
         self.temps_tour_2 = 0.0
         self.temps_tour2_2 = 0.0
         self.temps_tour_3 = 0.0
         self.temps_tour2_3 = 0.0
+
+        #Initialisation des dernières positions valides (ie sur la piste)
         self.last_pos_valide = (self.circuit.x_depart, self.circuit.y_depart)
         self.last_pos_valide2 = (self.circuit.x_depart, self.circuit.y_depart)
         self.sortie = True
         self.sortie2 = True
+
+        #intialisation de nouvelles variables qui permettent de rajouter du temps lors de sorties de piste
         self.temps_sortie = 0
         self.temps_sortie2 = 0
         self.penalite = [0,0,0]
         self.penalite2 = [0,0,0]
         self.penalite_tot = 0
         self.penalite_tot2 = 0
-        self.essence = CAPACITE_RESERVOIRE
-        self.essence2 = CAPACITE_RESERVOIRE
+
+        # Initialisation d'une variable qui trouve la couleur de la piste sous les roues pour adapter le dérapage
         self.couleur_sous_roues = self.surface_detection.get_at((int(self.voiture.x),int(self.voiture.y)))[:3]
+        self.couleur_sous_roues2 = self.surface_detection.get_at((int(self.voiture.x), int(self.voiture.y)))[:3]
+
+        # Initialisation de la variable qui vérifie sur la voiture est dans la zone de ravitaillement
         self.est_dans_ravitaillement = False
         self.est_dans_ravitaillement2 = False
-        # numéro du tour en cours
-        # À FAIRE (partie 1) : ajouter ici ce qu'il faut pour compter les tours,
-        # mémoriser le temps de chaque tour et le dernier point valide.
+
+        # Initialisation de la distance initiale à l'objet (infinie car on cherche un obstacle pluq proche)
+        self.distance_obstacle = float('inf')
+        self.distance2_obstacle = float('inf')
+
+        # Initialisation de variables qui gèrent la collision : on veut que les effets de la collision durent
+        # un certain temps, donc on met un booléen qui vérifie qu'on est dans le premier instant de la collision,
+        # puis on fait marcher cette collision pour x secondes, calculées grâce au temps de début de collision
+        self.temps_debut_collision = 0
+        self.collision_bool = False
+
+        # Permet de gérer l'essence dans le cas de la voiture automatique
+        self.arret_station2 = False
+        self.station_servie2 = False
+        self.essence_visee2 = 0
+
+        # Modifie les paramètres du véhicule dans le cas où le joueur choisit une moto
+        if self.voiture.choix == 'moto' :
+            self.voiture.k = 75
+            self.voiture_vitesse_max = 220
+            self.voiture.reservoir = 45
+            self.voiture.largeur = 0.8
+            self.voiture.longueur = 3.5
+        if self.voiture2.choix == 'moto' :
+            self.voiture2.k = 75
+            self.voiture2_vitesse_max = 220
+            self.voiture2.reservoir = 45
+            self.voiture2.largeur = 0.8
+            self.voiture2.longueur = 3.5
+
+        # Initialisation du reservoir d'essence
+        self.essence = self.voiture.reservoir
+        self.essence2 = self.voiture2.reservoir
+
 
 
 # permet de remettre la voiture au centre de la piste avec un angle nul
@@ -160,21 +212,28 @@ class Jeu:
                 meilleur_angle = math.atan2(dy, dx)
         return meilleur_point, meilleur_angle
 
-
+    #Cette fonction permet de compter le nombre de tour effecutés par la voiture, et en combien de temps elle le fait
     def compter_tour(self):
-        # dépend du circuit choisi
+        # La position dépend du circuit choisi
         if self.circuit.nom == "rectangle" or self.circuit.nom == "circuit_2" or self.circuit.nom == "circuit_4":
+            # On vérifie que la voiture passe bien la ligne de départ en ayant pour ancienne position x antérieure à x_départ
+            # On prend un temps > 5 pour que le compte de tour n'augmente pas au départ (5s de marge pour démarrer)
             if self.temps > 5 and self.voiture.x >= self.circuit.x_depart and self.voiture.ancien_x <= self.circuit.x_depart and abs((self.voiture.y - self.circuit.y_depart))<= self.circuit.largeur/2:
                 if self.tour ==1:
+                    # Prise en compte du temps de circuit 1
                     self.temps_tour_1 = self.temps
                 elif self.tour ==2:
                     self.temps_tour_2 = self.temps - self.temps_tour_1
                 elif self.tour ==3:
                     self.temps_tour_3 = self.temps - self.temps_tour_1- self.temps_tour_2
+                # On ajoute un tour au nombre de tour total effectué
                 self.tour += 1
+
+                #Fictivement, lorsque la course est finie, on est à 4 tours : c'est notre condition d'arrêt
                 if self.tour == (NOMBRE_DE_TOURS+1):
                     self.etat = 'fin'
 
+        #On fait de même pour le circuit rond, mais en changeant le départ puisque la ligne est selon x
         if self.circuit.nom == "circuit_rond":
             if self.temps > 5 and self.voiture.y >= self.circuit.y_depart and self.voiture.ancien_y <= self.circuit.y_depart and abs((self.voiture.x - self.circuit.x_depart))<= self.circuit.largeur/2:
                 if self.tour ==1:
@@ -199,17 +258,17 @@ class Jeu:
                 if self.tour == (NOMBRE_DE_TOURS+1):
                     self.etat = 'fin'
 
-
+    #Fait de même pour la voiture 2
     def compter_tour2(self):
         # dépend du circuit choisi
         if self.circuit.nom == "rectangle" or self.circuit.nom == "circuit_2" or self.circuit.nom == "circuit_4":
             if self.temps > 5 and self.voiture2.x >= self.circuit.x_depart and self.voiture2.ancien_x <= self.circuit.x_depart and abs((self.voiture2.y - self.circuit.y_depart))<= self.circuit.largeur/2:
                 if self.tour2 ==1:
-                    self.temps_tour_1 = self.temps
+                    self.temps_tour2_1 = self.temps
                 elif self.tour2 ==2:
-                    self.temps_tour_2 = self.temps - self.temps_tour2_1
+                    self.temps_tour2_2 = self.temps - self.temps_tour2_1
                 elif self.tour2 ==3:
-                    self.temps_tour_3 = self.temps - self.temps_tour2_1- self.temps_tour2_2
+                    self.temps_tour2_3 = self.temps - self.temps_tour2_1- self.temps_tour2_2
                 self.tour2 += 1
                 if self.tour2 == (NOMBRE_DE_TOURS+1):
                     self.etat = 'fin'
@@ -238,10 +297,12 @@ class Jeu:
                 if self.tour2 == (NOMBRE_DE_TOURS+1):
                     self.etat = 'fin'
 
+    #Calcul de la dernière position valide pour pouvoir revenir sur la piste en cas de sortie
     def derniere_pos_valide(self):
         if self.sur_la_piste == True:
             self.last_pos_valide = (self.voiture.x, self.voiture.y)
 
+    #De même pour la voiture 2
     def derniere_pos_valide2(self):
         if self.sur_la_piste2 == True:
             self.last_pos_valide2 = (self.voiture2.x, self.voiture2.y)
@@ -268,12 +329,42 @@ class Jeu:
 
 
     def gerer_evenements(self):
+        """Fermeture de la fenêtre et touches Espace, R, Échap."""
         for evenement in pygame.event.get():
             if evenement.type == pygame.QUIT:
                 self.en_marche = False
             elif evenement.type == pygame.KEYDOWN:
                 if evenement.key == pygame.K_ESCAPE:
                     self.en_marche = False
+
+                #On rajoute plusieurs étapes, la première étant de choisir le nombre de joueurs
+                elif self.etat == "choix_joueurs":
+                    if evenement.key == pygame.K_RIGHT:
+                        self.nombre_joueurs = 2
+                    elif evenement.key == pygame.K_LEFT:
+                        self.nombre_joueurs = 1
+                    elif evenement.key == pygame.K_RETURN:
+                        self.etat = "choix_vehicule_j1"
+
+                #On passe ensuite au choix du véhicule pour le joueur 1
+                elif self.etat == "choix_vehicule_j1":
+                    if evenement.key == pygame.K_RIGHT:
+                        self.voiture.choix = "moto"
+                    elif evenement.key == pygame.K_LEFT:
+                        self.voiture.choix = "voiture"
+                    elif evenement.key == pygame.K_RETURN:
+                        self.etat = "choix_vehicule_j2" if self.nombre_joueurs == 2 else "choix_circuit"
+
+                #S'il y a deux joueurs, on passe au choix du véhicule du joueur 2
+                elif self.etat == "choix_vehicule_j2":
+                    if evenement.key == pygame.K_RIGHT:
+                        self.voiture2.choix = "moto"
+                    elif evenement.key == pygame.K_LEFT:
+                        self.voiture2.choix = "voiture"
+                    elif evenement.key == pygame.K_RETURN:
+                        self.etat = "choix_circuit"
+
+                #On passe au choix du circuit
                 elif self.etat == "choix_circuit":
                     # pour faire le choix du circuit
                     if evenement.key == pygame.K_RIGHT:
@@ -287,6 +378,7 @@ class Jeu:
                     self.etat = "course"
                 elif evenement.key == pygame.K_r:
                     self.nouvelle_partie()
+
 
     def lire_commandes_clavier(self):
         """Transforme les touches enfoncées en commandes : (accélération, braquage)."""
@@ -311,16 +403,19 @@ class Jeu:
         touches = pygame.key.get_pressed()
 
         acceleration = 0.0  # aucune touche : roue libre
-        if touches[pygame.K_z]:
-            acceleration = ACCELERATION
-        elif touches[pygame.K_s]:
-            acceleration = -FREINAGE
         braquage = 0.0
         braquage_max = math.radians(BRAQUAGE_MAX_DEGRES)
-        if  touches[pygame.K_q]:
-            braquage = -braquage_max  # négatif : à gauche
-        elif touches[pygame.K_d]:
-            braquage = braquage_max  # positif : à droite
+
+        #On ne peut commander la nouvelle voiture que si on a choisi de conduire deux joueurs
+        if self.nombre_joueurs == 2 :
+            if touches[pygame.K_z]:
+                acceleration = ACCELERATION
+            elif touches[pygame.K_s]:
+                acceleration = -FREINAGE
+            if  touches[pygame.K_q]:
+                braquage = -braquage_max  # négatif : à gauche
+            elif touches[pygame.K_d]:
+                braquage = braquage_max  # positif : à droite
 
         return acceleration, braquage
 
@@ -329,6 +424,184 @@ class Jeu:
 
     def consommation2(self):
         return ALPHA * self.voiture2.vitesse * self.voiture2.vitesse + CONSO
+
+    #Permet de conduire la voiture automatique : on choisit une stratégie qui faire suivre la piste centrale
+    # à la voiture. Il faut donc calculer le point le plus proche dans les segments pour indiquer la direction à suivre
+    def centre_plus_proche(self, x,y) :
+        #initialisation à l'infini ; on ne peut être que plus proche
+        meilleur = (float("inf"), 0, 0)
+
+        for i, ((ax, ay), (bx, by)) in enumerate(self.circuit.segments):
+            #(dx, dy) = vecteur AB
+            dx, dy = bx - ax, by - ay
+            #et sa norme
+            longueur2 = dx * dx + dy * dy
+
+            if longueur2 == 0:
+                continue
+
+            #trouve à quel point il faut avancer sur AB pour atteindre B
+            t = max(0, min(1, ((x - ax) * dx + (y - ay) * dy) / longueur2))
+
+            #calcul de la distance à B
+            d = math.hypot(x - (ax + t * dx), y - (ay + t * dy))
+            if d < meilleur[0]:
+                meilleur = (d, i, t)
+        return meilleur
+
+    def point_devant_sur_ligne(self, i, t, avance):
+        segments = self.circuit.segments
+
+        # On extrait le segment que l'on suit, ainsi que la longueur du segment
+        (ax, ay), (bx, by) = segments[i]
+        longueur = math.hypot(bx - ax, by - ay)
+
+        # Position correspond à ce que l'on a déjà parcouru, reste ce qu'il nous faut encore parcourir
+        position = longueur * t
+        reste = longueur - position
+
+        # On change de segment si besoin
+        while avance > reste:
+            avance -= reste
+            # On passe au segment suivant en gérant le passage éventuel à un nouveau tour et on modifie nos valeurs
+            i = (i + 1) % len(segments)
+            (ax, ay), (bx, by) = segments[i]
+            longueur = math.hypot(bx - ax, by - ay)
+            position, reste = 0, longueur
+
+        # Calcul de la distance entre la point de départ du segment et le point visé
+        s = (position + avance) / max(longueur, 1e-9)
+
+        # Renvoie les coordonnées du point visé
+        return ax + s * (bx - ax), ay + s * (by - ay), i
+
+    # Vérifie si la voiture automatique est dans la station
+    def dans_station(self, voiture):
+        station = STATIONS.get(self.circuit.nom)
+        return (station is not None and abs(voiture.x - station[0]) <= 10 and abs(voiture.y - station[1]) <= 10)
+
+
+    # Fonction qui gère la manière dont la voiture automatique s'arrête à la station essence
+    def gerer_station(self, v_cible):
+        station = STATIONS.get(self.circuit.nom)
+
+        # S'il n'y a pas de station dans le circuit, pas de pb d'approvisionnement
+        if station is None:
+            return v_cible
+
+        # Calcul de la distance entre la voiture et la station
+        dist_st = math.hypot(station[0] - self.voiture2.x, station[1] - self.voiture2.y)
+
+        # Vérifie si la voiture est bien derrière la station
+        devant = ((station[0] - self.voiture2.x) * math.cos(self.voiture2.angle) + (station[1] - self.voiture2.y) * math.sin(self.voiture2.angle)) > 0
+
+        #On s'éloigne de la station
+        if dist_st > DIST_STATION:
+            self.station_servie2 = False
+            self.arret_station2 = False
+
+        # Station dépassée sans s'être arrêtée
+        if self.arret_station2 and not devant and not self.dans_station(self.voiture2):
+            self.arret_station2 = False
+
+        # Essence nécessaire pour terminer
+        tours_restants = NOMBRE_DE_TOURS - self.tour2 + 1
+        distance = tours_restants * self.circuit.longueur
+        nb_pas = distance / (VITESSE_MAX_KMH * DT)
+        besoin = MARGE_ESSENCE * nb_pas * (ALPHA * VITESSE_MAX_KMH ** 2 + CONSO)
+
+        # Décision de s'arrêter : on n'est pas déjà arrêté, on est derrière, on n'est pas trop loin et le réservoir ne suffit pas pour finir la course
+        if (not self.arret_station2 and not self.station_servie2 and dist_st < DIST_STATION and devant and self.essence2 < besoin):
+            self.arret_station2 = True
+            self.essence_visee2 = min(CAPACITE_RESERVOIRE, besoin)
+
+        if not self.arret_station2:
+            return v_cible
+
+        # Arrêt dans la station : vitesse nulle tant que le réservoir n'est pas rempli comme on le souahit
+        if self.dans_station(self.voiture2):
+            if self.essence2 >= self.essence_visee2:
+                self.arret_station2 = False
+                self.station_servie2 = True
+                return v_cible
+            return 0
+
+        # Ralentissement à l'approche : vitesse proportionnelle à la distance restante (sinon on dépasse la station)
+        MARGE_ARRET = 5
+        dist_restante = max(0.0, dist_st - MARGE_ARRET)
+        v_freinage = VITESSE_MAX_KMH * dist_restante / DIST_STATION
+
+        if self.voiture2.vitesse > v_freinage + 1:
+            self.voiture2.vitesse = v_freinage + 1
+
+        return min(v_cible, v_freinage)
+
+    # Calcul de à quel point l'angle à venir est grand
+    def courbure_devant(self, i, t, d1=20, d2=60):
+        x0, y0, _ = self.point_devant_sur_ligne(i, t, 0)
+        x1, y1, _ = self.point_devant_sur_ligne(i, t, d1)
+        x2, y2, _ = self.point_devant_sur_ligne(i, t, d2)
+
+        # Calcul des angles devant
+        a1 = math.atan2(y1 - y0, x1 - x0)
+        a2 = math.atan2(y2 - y1, x2 - x1)
+
+        # On calcule l'angle entre les deux segments (modulo pour que atan soit dans le bon intervalle)
+        return abs(math.atan2(math.sin(a2 - a1), math.cos(a2 - a1)))
+
+    def pilote_auto(self, voiture, essence, tour):
+        d, i, t = self.centre_plus_proche(voiture.x, voiture.y)
+        station = STATIONS.get(self.circuit.nom)
+        v_station = self.gerer_station(VITESSE_MAX_KMH)
+
+        avance = max(15, min(60, 0.8 * voiture.vitesse + 2 * d))
+        cx, cy, _ = self.point_devant_sur_ligne(i, t, avance)
+
+        if self.arret_station2 and station is not None:
+            dist_st = math.hypot(station[0] - voiture.x, station[1] - voiture.y)
+            if dist_st < 50:  # on ne quitte la ligne que pour les derniers mètres
+                cx, cy = station
+
+        # --- Erreur de cap ---
+        erreur = math.atan2(cy - voiture.y, cx - voiture.x) - voiture.angle
+        erreur = math.atan2(math.sin(erreur), math.cos(erreur))
+
+        # --- Braquage : gain modéré, limité selon la vitesse ---
+        braquage_max = math.radians(BRAQUAGE_MAX_DEGRES)
+        facteur = 1 / (1 + (voiture.vitesse / (0.8 * VITESSE_MAX_KMH)) ** 2)
+        braquage_max *= max(0.6, facteur)
+        braquage_voulu = max(-braquage_max, min(braquage_max, 2 * erreur))
+
+        # --- Lissage : le braquage ne peut pas changer brusquement ---
+        prec = getattr(self, "braquage_prec", 0.0)
+        pas = 0.15 * math.radians(BRAQUAGE_MAX_DEGRES)  # variation max par appel
+        braquage = max(prec - pas, min(prec + pas, braquage_voulu))
+        self.braquage_prec = braquage
+
+        # --- Vitesse ---
+        v_cible = 0.5 * VITESSE_MAX_KMH
+        courbure = self.courbure_devant(i, t, d1=20, d2=60)
+        v_cible *= max(0.2, 1 - 3 * courbure)
+
+        if d > 6:  # loin de la ligne
+            v_cible = min(v_cible, VITESSE_MAX_KMH / 3)
+
+        if abs(braquage) > 0.6 * braquage_max:  # gros braquage -> on freine
+            v_cible = min(v_cible, 0.25 * VITESSE_MAX_KMH)
+
+        v_cible = min(v_cible, v_station)
+
+        if v_cible == 0 and voiture.vitesse <= 2:
+            voiture.vitesse = 0
+            acceleration = 0.0
+        elif voiture.vitesse < v_cible:
+            acceleration = ACCELERATION
+        elif voiture.vitesse > v_cible + 0.5:
+            acceleration = -FREINAGE
+        else:
+            acceleration = 0.0
+
+        return acceleration, braquage
 
 
     # La fonction faire_un_pas gere les voitures 1 et 2 en même temps.
@@ -339,11 +612,64 @@ class Jeu:
         """Un pas de simulation de DT secondes."""
         # 1) Lire les commandes
         # joueur 1
+        # voiture 1 : toujours le joueur
         acceleration, braquage = self.lire_commandes_clavier()
-        self.voiture.avancer(acceleration, braquage, DT)
-        # joueur 2
-        acceleration2, braquage2 = self.lire_commandes_deuxieme_voiture()
-        self.voiture2.avancer(acceleration2, braquage2, DT)
+
+        # La vitesse est soit décidée par le pilote auto, dans le cas où il n'y a qu'un joueur, soit par les flèches s'il y a deux joueurs
+        if self.nombre_joueurs == 2 :
+            acceleration2, braquage2 = self.lire_commandes_deuxieme_voiture()
+        else:
+            acceleration2, braquage2 = self.pilote_auto(self.voiture2, self.essence2, self.tour2)
+
+        dx = self.voiture2.x - self.voiture.x
+        dy = self.voiture2.y - self.voiture.y
+
+        # Début de la modélisation de la collision : calcul de la distance entre les voitures et de laquelle est devant
+        distance_longitudinale = (dx * math.cos(self.voiture.angle) + dy * math.sin(self.voiture.angle))
+        distance_voitures = math.sqrt((self.voiture.x - self.voiture2.x) ** 2 + (self.voiture.y - self.voiture2.y) ** 2)
+        puissance_collision = 2
+
+        # 2) Mettre à jour la position
+        # Dans le cas normal, pas de collision
+        if distance_voitures > self.voiture.longueur and self.collision_bool == False:
+            self.voiture.avancer(acceleration, braquage, DT)
+            self.voiture2.avancer(acceleration2, braquage2, DT)
+
+        # Dans le cas où il y a collision, le booléen fait en sortie qu'on sache que c'est le début de la collision
+        elif self.collision_bool == False :
+            self.temps_debut_collision = self.temps
+            self.collision_bool = True
+
+            # On diminue alors la vitesse des deux voitures
+            self.voiture.vitesse *= 0.7
+            self.voiture2.vitesse *= 0.7
+
+            # On fait en sorte que les voitures "rebondissent" l'une sur l'autre, l'une vers l'avant, l'autre vers l'arrière
+            if distance_longitudinale > 0 :
+                self.voiture.vitesse = -self.voiture.vitesse
+            else :
+                self.voiture2.vitesse = -self.voiture2.vitesse
+
+        # On continue la collsion : on fait rebomdirent les voitures
+        elif self.collision_bool == True :
+            if distance_longitudinale > 0 :
+                self.voiture.x -= puissance_collision*math.cos(self.voiture.angle)
+                self.voiture.y -= puissance_collision*math.sin(self.voiture.angle)
+                self.voiture2.x += puissance_collision*math.cos(self.voiture2.angle)
+                self.voiture2.y += puissance_collision*math.sin(self.voiture2.angle)
+            else :
+                self.voiture.x += puissance_collision*math.cos(self.voiture.angle)
+                self.voiture.y += puissance_collision*math.sin(self.voiture.angle)
+                self.voiture2.x -= puissance_collision*math.cos(self.voiture2.angle)
+                self.voiture2.y -= puissance_collision*math.sin(self.voiture2.angle)
+
+        # La collision dure 0.4s, après quoi les voitures peuvent repartir normalement, on inverse à nouveau les vitesses
+        if self.temps - self.temps_debut_collision > 0.4 and self.collision_bool == True:
+            if distance_longitudinale > 0 :
+                self.voiture.vitesse = -self.voiture.vitesse
+            else :
+                self.voiture2.vitesse = -self.voiture2.vitesse
+            self.collision_bool = False
 
         self.temps = self.temps + DT
 
@@ -353,12 +679,23 @@ class Jeu:
 
         # 3) Voiture 1 sur la piste ?
         self.sur_la_piste = self.circuit.est_sur_la_piste(self.voiture.x, self.voiture.y)
+
+        # À FAIRE (partie 1) — sortie de piste.
+        #   Pour l'instant, on affiche seulement « HORS PISTE ». Le sujet demande :
+        #   vitesse réduite, retour au dernier point valide, pénalité de temps.
+        #   Idée : à chaque pas où la voiture est sur la piste, mémoriser sa position.
+
+        # On vérifie la condition que l'on n'est pas sur la piste et on diminue alors la vitesse
         if self.sur_la_piste == False:
             self.voiture.vitesse = self.voiture.vitesse/1.1
+
+            # Pour n'ajouter qu'une fois la pénalité, on crée un booléen qui ne change pas tant qu'on est hors de piste
             if self.sortie == True:
                 self.temps_sortie = self.temps
                 self.penalite_tot = self.penalite_tot + 1
                 self.sortie = False
+
+                # On compte les pénalités par tour
                 if self.tour == 1:
                     self.penalite[0] += 1
                 elif self.tour == 2:
@@ -366,17 +703,15 @@ class Jeu:
                 elif self.tour == 3:
                     self.penalite[2] += 1
             elif (self.temps - self.temps_sortie) > 1:
-
-                centre, angle = self.centre_piste_proche(
-                    self.last_pos_valide[0],
-                    self.last_pos_valide[1]
-                )
+                #On se remet sur la dernière position valide
+                centre, angle = self.centre_piste_proche(self.last_pos_valide[0],self.last_pos_valide[1])
 
                 if centre is not None:
                     self.voiture.x = centre[0]
                     self.voiture.y = centre[1]
                     self.voiture.angle = angle
 
+                # On remet la booléen à True
                 self.sortie = True
 
         self.compter_tour()
@@ -436,7 +771,7 @@ class Jeu:
         elif (self.circuit.nom == "circuit_4" and  abs(self.voiture.x- 242) <= 10 and abs(self.voiture.y -62) <= 10):
             self.est_dans_ravitaillement = True
 
-        if self.est_dans_ravitaillement == True and self.essence <= CAPACITE_RESERVOIRE:
+        if self.est_dans_ravitaillement == True and self.essence <= self.voiture.reservoir :
             self.essence = self.essence + 0.5
 
         # Ravitaillement_2
@@ -452,11 +787,8 @@ class Jeu:
         elif (self.circuit.nom == "circuit_4" and  abs(self.voiture2.x- 242) <= 10 and abs(self.voiture2.y -62) <= 10):
             self.est_dans_ravitaillement2 = True
 
-        if self.est_dans_ravitaillement2 == True and self.essence2 <= CAPACITE_RESERVOIRE:
+        if self.est_dans_ravitaillement2 == True and self.essence2 <= self.voiture2.reservoir:
             self.essence2 = self.essence2 + 0.5
-
-
-
 
         largeur, hauteur = self.surface_detection.get_size()
         x, y = self.vers_ecran(self.voiture.x, self.voiture.y)
@@ -465,6 +797,62 @@ class Jeu:
         else:
             self.couleur_sous_roues = None
 
+        # Mise en place du radar
+        # On place l'obstacle au plus loin pour qu'un autre objet soit plus proche
+        self.distance_obstacle = float('inf')
+
+        # On fait des lignes de 50
+        for i in range(51) :
+            # On en fait 5 sur 120 degrés
+            for j in [-60, -30, 0, 30, 60] :
+                angle = math.radians(j) + self.voiture.angle
+                x = self.voiture.x + i*math.sin(angle)
+                y = self.voiture.y + i*math.cos(angle)
+                distance_radar = math.sqrt((x - self.voiture2.x) ** 2 + (y - self.voiture2.y) ** 2)
+
+                # On calcule la distance à la piste (et on update l'obstacle le plus proche s'il est plus proche)
+                if not self.circuit.est_sur_la_piste(x,y) :
+                    if self.distance_obstacle > i :
+                        self.distance_obstacle = i
+
+                # On calcule la distance à la voiture 2
+                if distance_radar < LONGUEUR_VOITURE/2:
+                    if self.distance_obstacle < i :
+                        self.distance_obstacle = i
+
+        # On fait de même pour la voiture 2
+        self.distance2_obstacle = float('inf')
+        for i in range(51):
+            for j in [-60, -30, 0, 30, 60]:
+                angle = math.radians(j) + self.voiture2.angle
+                x = self.voiture2.x + i * math.sin(angle)
+                y = self.voiture2.y + i * math.cos(angle)
+                distance_radar = math.sqrt((x - self.voiture.x) ** 2 + (y - self.voiture.y) ** 2)
+
+                if not self.circuit.est_sur_la_piste(x, y):
+                    if self.distance2_obstacle > i:
+                        self.distance2_obstacle = i
+
+                if distance_radar < LONGUEUR_VOITURE / 2:
+                    if self.distance2_obstacle < i:
+                        self.distance2_obstacle = i
+
+
+        # À FAIRE (partie 1) — compter les tours et le temps de chaque tour.
+        #   Idée : un tour est bouclé quand la voiture franchit la ligne de départ
+        #   (le premier point du circuit) APRÈS être passée par un point de passage
+        #   situé à l'opposé du circuit. Sinon, des allers-retours sur la ligne
+        #   compteraient des tours !
+
+        # À FAIRE (partie 1) — fin de course.
+        #   Après NOMBRE_DE_TOURS tours, passer à l'écran de fin : self.etat = "fin"
+
+    # essence
+    def quantite_essence(self):
+        self.quantite = CAPACITE_RESERVOIRE
+        while self.quantite > 0:
+            self.quantite = self.quantite - self.consommation()
+
 
     # Le dessin
     def vers_ecran(self, x, y):
@@ -472,9 +860,25 @@ class Jeu:
         return (x * ECHELLE, HAUTEUR_BANDEAU + y * ECHELLE)
 
     def dessiner(self):
-        """Redessine tout l'écran, puis l'affiche."""
+        # On dessine le choix des joueurs en fonction de l'état
+        if self.etat == "choix_joueurs":
+            self.dessiner_choix_joueurs()
+            pygame.display.flip()
+            return
+
+        # On dessine aussi le choix du circuit en fonction de l'état
         if self.etat == "choix_circuit":
             self.dessiner_choix_circuit()
+            pygame.display.flip()
+            return
+
+        # De même pour les choix des véhicules
+        if self.etat == "choix_vehicule_j1" :
+            self.dessiner_choix_vehicule_j1()
+            pygame.display.flip()
+            return
+        if self.etat == "choix_vehicule_j2" :
+            self.dessiner_choix_vehicule_j2()
             pygame.display.flip()
             return
         self.ecran.fill(COULEUR_HERBE)
@@ -490,11 +894,51 @@ class Jeu:
             self.dessiner_accueil()
         if self.etat == "fin":
             self.dessiner_fin()
-        if self.etat == "course" and self.est_dans_ravitaillement:
-            self.ecrire_au_centre("RAVITAILLEMENT EN COURS", self.grande_police, COULEUR_VOITURE, HAUTEUR_FENETRE // 2 - 30)
-        if self.etat == "course" and self.est_dans_ravitaillement2:
-            self.ecrire_au_centre("RAVITAILLEMENT EN COURS", self.grande_police, COULEUR_VOITURE_2, HAUTEUR_FENETRE // 2 +15 )
         pygame.display.flip()
+
+    # Dessin du choix du véhicule, fonctions sur le même modèle que le choix du circuit
+    def dessiner_choix_vehicule(self, numero, choix):
+
+        self.ecran.fill(COULEUR_HERBE)
+        self.ecrire_au_centre("RALLY BREIZH FURIOUS", self.grande_police, COULEUR_TEXTE, 150)
+        self.ecrire_au_centre(f"Joueur {numero} : choisissez votre véhicule",
+                              self.police, COULEUR_TEXTE, 250)
+
+        # Option voiture
+        couleur1 = (255, 220, 0) if choix == "voiture" else COULEUR_TEXTE
+        self.ecrire_au_centre("VOITURE", self.grande_police, couleur1, 330)
+
+        # Option moto
+        couleur2 = (255, 220, 0) if choix == "moto" else COULEUR_TEXTE
+        self.ecrire_au_centre("MOTO", self.grande_police, couleur2, 400)
+
+        self.ecrire_au_centre("<  Fleches gauche / droite  >", self.police, COULEUR_TEXTE, 490)
+        self.ecrire_au_centre("ENTREE pour valider", self.police, COULEUR_ALERTE, 530)
+
+    def dessiner_choix_vehicule_j1(self):
+        self.dessiner_choix_vehicule(1, self.voiture.choix)
+
+    def dessiner_choix_vehicule_j2(self):
+        self.dessiner_choix_vehicule(2, self.voiture2.choix)
+
+    # Sur le même modèle que le choix du circuit
+    def dessiner_choix_joueurs(self):
+
+        self.ecran.fill(COULEUR_HERBE)
+        self.ecrire_au_centre("RALLY BREIZH FURIOUS",self.grande_police,COULEUR_TEXTE,150)
+        self.ecrire_au_centre("Choisissez le nombre de joueurs",self.police,COULEUR_TEXTE,250)
+
+        # Option 1 joueur
+        couleur1 = (255, 220, 0) if self.nombre_joueurs == 1 else COULEUR_TEXTE
+
+        self.ecrire_au_centre("1 JOUEUR",self.grande_police,couleur1,330)
+
+        # Option 2 joueurs
+        couleur2 = (255, 220, 0) if self.nombre_joueurs == 2 else COULEUR_TEXTE
+
+        self.ecrire_au_centre("2 JOUEURS",self.grande_police,couleur2,400)
+        self.ecrire_au_centre("<  Fleches gauche / droite  >",self.police,COULEUR_TEXTE,490)
+        self.ecrire_au_centre("ENTREE pour valider",self.police,COULEUR_ALERTE,530)
 
 
     def dessiner_piste(self):
@@ -511,6 +955,7 @@ class Jeu:
                     rectangle = [self.vers_ecran(ax + px, ay + py), self.vers_ecran(bx + px, by + py),
                                  self.vers_ecran(bx - px, by - py), self.vers_ecran(ax - px, ay - py)]
                     pygame.draw.polygon(self.ecran, couleur, rectangle)
+                    pygame.draw.polygon(self.surface_detection, couleur, rectangle)
                 for i in range(debut, min(fin + 1, len(self.circuit.points))):
                     x, y = self.circuit.points[i]
                     pygame.draw.circle(self.ecran, couleur, self.vers_ecran(x, y), int(demi_largeur * ECHELLE))
@@ -558,18 +1003,11 @@ class Jeu:
         pygame.draw.polygon(self.ecran, COULEUR_VOITURE, coins)
         pygame.draw.line(self.ecran, COULEUR_BORD, coins[0], coins[1], 3)   # l'avant
 
-    def dessiner_autre_voiture(self):
+    def dessiner_autre_voiture(self) :
         fraction = self.reserve_de_temps / DT if self.etat == "course" else 1.0
-
-        coins = [
-            self.vers_ecran(x, y)
-            for x, y in self.voiture2.coins(fraction, AGRANDIR_VOITURE)
-        ]
-
+        coins = [self.vers_ecran(x, y) for x, y in self.voiture2.coins(fraction, AGRANDIR_VOITURE)]
         pygame.draw.polygon(self.ecran, (30, 100, 220), coins)
         pygame.draw.line(self.ecran, COULEUR_BORD, coins[0], coins[1], 3)
-
-
 
     def dessiner_bandeau(self):
         """La bande du haut : tour, temps, vitesse."""
@@ -578,12 +1016,15 @@ class Jeu:
         self.ecrire(texte, 20, 18, COULEUR_TEXTE)
         texte_bas = (f" Tour : {self.tour2} / {NOMBRE_DE_TOURS}   "
                      f" Vitesse : {self.voiture2.vitesse_kmh():.0f} km/h"
-                     f"     Essence : {self.essence2:.0f} L                         ")
+                     f"     Essence : {self.essence2:.0f} L                         "
+                     f" Distance obstacle : {self.distance_obstacle:.0f} m")
         self.ecrire_au_centre(texte_bas, self.police , (30, 100, 220), 48)
 
-        texte_haut = (f" Tour : {self.tour} / {NOMBRE_DE_TOURS}   "
-                      f" Vitesse : {self.voiture.vitesse_kmh():.0f} km/h"
-                      f"     Essence : {self.essence:.0f} L                         ")
+        texte_haut = (
+            f" Tour : {self.tour} / {NOMBRE_DE_TOURS}   "
+            f" Vitesse : {self.voiture.vitesse_kmh():.0f} km/h"
+            f"     Essence : {self.essence:.0f} L"
+            f"     Distance obstacle : {self.distance2_obstacle:.0f} m")
         self.ecrire_au_centre(texte_haut, self.police, COULEUR_VOITURE, 18)
         self.ecrire("R : recommencer    Échap : quitter", LARGEUR_FENETRE - 360, 18, COULEUR_LIGNE_CENTRALE)
 
